@@ -168,9 +168,21 @@ export function DataTableWidget({ widget }: DataTableWidgetProps) {
     });
   };
 
-  const formatCellValue = (value: unknown): string => {
+  const formatCellValue = (value: unknown, column?: string): string => {
     if (value === null || value === undefined) return '-';
+
     if (typeof value === 'number') {
+      const isCurrency = column && ['Price', 'High', 'Low', 'Open', 'PrevClose', 'NSE', 'BSE', 'currentPrice'].some(c => column.toLowerCase().includes(c.toLowerCase()));
+
+      if (isCurrency) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: widget.currency || 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value);
+      }
+
       if (Math.abs(value) >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
       if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
       if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
@@ -374,7 +386,7 @@ export function DataTableWidget({ widget }: DataTableWidgetProps) {
                                 {columns.slice(0, 5).map((column) => (
                                   <TableCell key={column} className="py-2 font-mono text-xs">
                                     <span className="truncate block max-w-[150px]">
-                                      {formatCellValue((row as Record<string, unknown>)[column])}
+                                      {formatCellValue((row as Record<string, unknown>)[column], column)}
                                     </span>
                                   </TableCell>
                                 ))}

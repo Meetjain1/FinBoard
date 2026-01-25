@@ -109,10 +109,10 @@ export function DashboardGrid() {
     }
 
     // Market movers special case
-    if (widget.apiUrl?.includes('TOP_GAINERS_LOSERS') || widget.name?.includes('Market Movers') || widget.name?.includes('NSE Stocks')) {
+    if (widget.cardLayout === 'movers' || widget.apiUrl?.includes('TOP_GAINERS_LOSERS') || widget.name?.includes('Market Movers') || widget.name?.includes('NSE Stocks')) {
       return (
         <div key={widget.id} className="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-2">
-          <MarketMoversWidget widget={{ ...widget, type: 'table' }} />
+          <MarketMoversWidget widget={widget} />
         </div>
       );
     }

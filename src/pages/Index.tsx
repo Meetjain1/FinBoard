@@ -12,6 +12,7 @@ import { EditWidgetDialog } from '@/components/widgets/EditWidgetDialog';
 import { TemplateDialog } from '@/components/widgets/TemplateDialog';
 import { useDashboardStore } from '@/store/dashboardStore';
 import { useToast } from '@/hooks/use-toast';
+import { getExchangeRates } from '@/lib/currency';
 
 const Index = () => {
   const { setTheme, widgets, reorderWidgets } = useDashboardStore();
@@ -52,6 +53,11 @@ const Index = () => {
       }
     }
   }, []); // Only run once on mount
+
+  // Prefetch exchange rates
+  useEffect(() => {
+    getExchangeRates();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

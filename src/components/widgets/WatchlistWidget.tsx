@@ -19,6 +19,7 @@ import {
 import { useDashboardStore } from '@/store/dashboardStore';
 import { getStockQuote, getCryptoQuote, searchSymbols, formatNumber } from '@/lib/api';
 import { POPULAR_SYMBOLS, POPULAR_CRYPTO } from '@/lib/constants';
+import { convertCurrencySync } from '@/lib/currency';
 import type { WidgetConfig, StockQuote, WatchlistItem } from '@/types/widget';
 
 interface WatchlistWidgetProps {
@@ -42,29 +43,41 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
 
   const fetchQuotes = useCallback(async () => {
     if (symbols.length === 0) return;
-    
+
     setWidgetLoading(widget.id, true);
-    
+
     try {
       const quotes: Record<string, StockQuote> = {};
-      
+
       // Fetch quotes one by one with delay to avoid rate limiting
       for (let i = 0; i < symbols.length; i++) {
         try {
           const fetchFn = isCryptoSymbol(symbols[i]) ? getCryptoQuote : getStockQuote;
-          const quote = await fetchFn(symbols[i]);
+          let quote = await fetchFn(symbols[i]);
+
+          if (widget.currency && widget.currency !== 'USD') {
+            const targetCurrency = widget.currency;
+            const sourceCurrency = 'USD'; // Assuming base data is USD
+
+            quote = {
+              ...quote,
+              price: convertCurrencySync(quote.price, sourceCurrency, targetCurrency),
+              change: convertCurrencySync(quote.change, sourceCurrency, targetCurrency),
+            };
+          }
+
           quotes[symbols[i]] = quote;
         } catch (err) {
           // Continue with other symbols if one fails
           console.error(`Failed to fetch ${symbols[i]}:`, err);
         }
-        
+
         // Small delay between requests
         if (i < symbols.length - 1) {
           await new Promise(r => setTimeout(r, 200));
         }
       }
-      
+
       setWidgetData(widget.id, { data: { quotes }, loading: false, error: null });
     } catch (error) {
       setWidgetError(widget.id, error instanceof Error ? error.message : 'Failed to fetch quotes');
@@ -73,7 +86,7 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
 
   useEffect(() => {
     fetchQuotes();
-    
+
     if (widget.refreshInterval > 0) {
       const interval = setInterval(fetchQuotes, widget.refreshInterval * 1000);
       return () => clearInterval(interval);
@@ -86,13 +99,13 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
       setSearchResults([]);
       return;
     }
-    
+
     if (widget.apiProvider === 'crypto') {
       const results = POPULAR_CRYPTO.filter((c) => c.symbol.includes(query.toUpperCase()) || c.name.toLowerCase().includes(query.toLowerCase()));
       setSearchResults(results.slice(0, 6).map(r => ({ symbol: r.symbol, name: r.name })));
       return;
     }
-    
+
     setIsSearching(true);
     try {
       const results = await searchSymbols(query);
@@ -148,13 +161,13 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
                   className="pl-9"
                 />
               </div>
-              
+
               {isSearching && (
                 <div className="flex justify-center py-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
               )}
-              
+
               {searchResults.length > 0 && (
                 <div className="space-y-1">
                   {searchResults.map((result) => (
@@ -169,7 +182,7 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
                   ))}
                 </div>
               )}
-              
+
               {searchQuery.length < 2 && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground mb-2">Popular {widget.apiProvider === 'crypto' ? 'crypto assets' : 'stocks'}:</p>
@@ -209,7 +222,7 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
                 {symbols.map((symbol) => {
                   const quote = quotes[symbol];
                   const isPositive = quote?.change !== undefined && quote.change >= 0;
-                  
+
                   return (
                     <motion.div
                       key={symbol}
@@ -222,12 +235,12 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{symbol}</span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         {quote ? (
                           <>
                             <span className="font-mono text-sm font-medium">
-                              {formatNumber(quote.price, 'currency')}
+                              {formatNumber(quote.price, 'currency', widget.currency)}
                             </span>
                             <span className={`flex items-center gap-0.5 font-mono text-xs ${isPositive ? 'text-gain' : 'text-loss'}`}>
                               {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -237,7 +250,7 @@ export function WatchlistWidget({ widget }: WatchlistWidgetProps) {
                         ) : (
                           <Skeleton className="h-4 w-16" />
                         )}
-                        
+
                         <button
                           onClick={() => handleRemoveSymbol(symbol)}
                           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"

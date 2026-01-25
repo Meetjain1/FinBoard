@@ -72,9 +72,8 @@ export function MarketMoversWidget({ widget }: MarketMoversWidgetProps) {
               key={key}
               variant="ghost"
               size="sm"
-              className={`flex-1 h-8 gap-1.5 text-xs ${
-                activeTab === key ? 'bg-background shadow-sm' : ''
-              } ${key === 'gainers' ? 'text-gain' : key === 'losers' ? 'text-loss' : ''}`}
+              className={`flex-1 h-8 gap-1.5 text-xs ${activeTab === key ? 'bg-background shadow-sm' : ''
+                } ${key === 'gainers' ? 'text-gain' : key === 'losers' ? 'text-loss' : ''}`}
               onClick={() => setActiveTab(key)}
             >
               {icon}
@@ -108,7 +107,12 @@ export function MarketMoversWidget({ widget }: MarketMoversWidgetProps) {
                       </div>
                     </TableCell>
                     <TableCell className="py-2 text-right font-mono text-sm">
-                      ${parseFloat(stock.price).toFixed(2)}
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: widget.currency || 'USD',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(parseFloat(stock.price))}
                     </TableCell>
                     <TableCell className={`py-2 text-right font-mono text-sm ${isPositive ? 'text-gain' : 'text-loss'}`}>
                       {formatPercent(stock.change_percentage)}

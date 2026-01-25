@@ -5,10 +5,10 @@
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useDashboardStore } from '@/store/dashboardStore';
-import { 
-  getStockQuote, 
-  getTimeSeries, 
-  getTopGainersLosers, 
+import {
+  getStockQuote,
+  getTimeSeries,
+  getTopGainersLosers,
   getValueByPath,
   finnhubWS,
   sanitizeErrorMessage,
@@ -17,7 +17,8 @@ import {
 } from '@/lib/api';
 import { getIndianStocks, getIndianStockDetails } from '@/lib/indianApi';
 import { INDIAN_API_KEY } from '@/lib/constants';
-import type { WidgetConfig, StockQuote } from '@/types/widget';
+import { convertCurrencySync } from '@/lib/currency';
+import type { WidgetConfig, StockQuote, MarketGainer } from '@/types/widget';
 
 // WebSocket trade data type
 interface WSTradeData {
@@ -47,10 +48,10 @@ export function useWidgetData(widget: WidgetConfig) {
 
   const fetchData = useCallback(async () => {
     setWidgetLoading(widget.id, true);
-    
+
     try {
       let result: Record<string, unknown> = {};
-      
+
       // Stock quote widget using Finnhub
       if (widget.symbol && widget.type === 'card' && widget.apiProvider !== 'indianapi') {
         const quote = await getStockQuote(widget.symbol);
@@ -74,7 +75,7 @@ export function useWidgetData(widget: WidgetConfig) {
       }
       // Market movers table using IndianAPI
       else if (widget.apiUrl?.includes('TOP_GAINERS_LOSERS') || widget.name?.includes('Market Movers')) {
-        const gainersLosers = await getTopGainersLosers();
+        const gainersLosers = await getTopGainersLosers(widget.apiUrl);
         result = gainersLosers;
       }
       // IndianAPI endpoints
@@ -115,10 +116,15 @@ export function useWidgetData(widget: WidgetConfig) {
         const rows: Array<Record<string, unknown>> = [];
         for (const sym of widget.symbols) {
           try {
-            if (currentDashboardType === 'crypto' || widget.apiProvider === 'crypto') {
+            // Priority 1: Widget explicitly set to a provider
+            // Priority 2: Dashboard context, but only if symbol matches the context
+            const isCryptoSym = ['BTC', 'ETH', 'SOL', 'MATIC', 'XRP', 'ADA', 'AVAX'].includes(sym) || widget.apiProvider === 'crypto';
+            const isIndianSym = (widget.apiProvider as any) === 'indianapi' || (currentDashboardType === 'indian-market' && !isCryptoSym && sym.length > 3);
+
+            if (isCryptoSym) {
               const q = await getCryptoQuote(sym);
               rows.push({ Symbol: q.symbol, Price: q.price, Change: q.change, 'Change %': q.changePercent, High: q.high, Low: q.low });
-            } else if (currentDashboardType === 'indian-market' || (widget.apiProvider as string) === 'indianapi') {
+            } else if (isIndianSym) {
               const s = await getIndianStockDetails(sym);
               rows.push({ Company: s.companyName, NSE: s.currentPrice.NSE, 'Change %': s.percentChange, '52W High': s.yearHigh, '52W Low': s.yearLow });
             } else {
@@ -134,13 +140,13 @@ export function useWidgetData(widget: WidgetConfig) {
       // Custom API endpoint with optional headers
       else if (widget.apiUrl) {
         const headers: Record<string, string> = {};
-        if (widget.apiUrl.includes('indianapi')) {
+        if (widget.apiUrl.includes('indianapi') || ((widget.apiProvider as any) === 'indianapi' && widget.apiUrl.includes('trending'))) {
           headers['X-Api-Key'] = INDIAN_API_KEY;
         }
-        
+
         const jsonRaw = await fetchCustomApi(widget.apiUrl, widget.id, headers);
         const json = scrubSecrets(jsonRaw) as Record<string, unknown>;
-        
+
         // Extract selected fields
         if (widget.selectedFields.length > 0) {
           widget.selectedFields.forEach((field) => {
@@ -150,7 +156,76 @@ export function useWidgetData(widget: WidgetConfig) {
           result = json;
         }
       }
-      
+
+      // Post-process for currency conversion if needed
+      const sourceCurrency = (widget.apiProvider === 'indianapi' ||
+        widget.apiUrl?.includes('indianapi') ||
+        currentDashboardType === 'indian-market') ? 'INR' : 'USD';
+      const targetCurrency = widget.currency || 'USD';
+
+      if (sourceCurrency !== targetCurrency) {
+        console.log(`Converting widget ${widget.id} from ${sourceCurrency} to ${targetCurrency}`);
+
+        // Convert quote data
+        if (result.quote) {
+          const q = result.quote as StockQuote;
+          result.quote = {
+            ...q,
+            price: convertCurrencySync(q.price, sourceCurrency, targetCurrency),
+            high: convertCurrencySync(q.high, sourceCurrency, targetCurrency),
+            low: convertCurrencySync(q.low, sourceCurrency, targetCurrency),
+            open: convertCurrencySync(q.open, sourceCurrency, targetCurrency),
+            previousClose: convertCurrencySync(q.previousClose, sourceCurrency, targetCurrency),
+            change: convertCurrencySync(q.change, sourceCurrency, targetCurrency),
+          };
+        }
+
+        // Convert time series data
+        if (Array.isArray(result.timeSeries)) {
+          result.timeSeries = (result.timeSeries as any[]).map(point => ({
+            ...point,
+            open: convertCurrencySync(point.open, sourceCurrency, targetCurrency),
+            high: convertCurrencySync(point.high, sourceCurrency, targetCurrency),
+            low: convertCurrencySync(point.low, sourceCurrency, targetCurrency),
+            close: convertCurrencySync(point.close, sourceCurrency, targetCurrency),
+          }));
+        }
+
+        // Convert table rows
+        if (Array.isArray(result.rows)) {
+          result.rows = (result.rows as any[]).map(row => {
+            const nextRow = { ...row };
+            const currencyFields = ['Price', 'High', 'Low', 'Open', 'PrevClose', 'NSE', 'BSE', 'currentPrice'];
+            currencyFields.forEach(field => {
+              if (typeof nextRow[field] === 'number') {
+                nextRow[field] = convertCurrencySync(nextRow[field] as number, sourceCurrency, targetCurrency);
+              }
+            });
+            return nextRow;
+          });
+        }
+
+        // Convert custom fields that look like numbers
+        if (widget.selectedFields?.length > 0) {
+          widget.selectedFields.forEach(field => {
+            if (field.type === 'number' && typeof result[field.label] === 'number') {
+              result[field.label] = convertCurrencySync(result[field.label] as number, sourceCurrency, targetCurrency);
+            }
+          });
+        }
+
+        // Convert market mover prices
+        const moverKeys: ('gainers' | 'losers' | 'mostActive')[] = ['gainers', 'losers', 'mostActive'];
+        moverKeys.forEach(key => {
+          if (Array.isArray(result[key])) {
+            result[key] = (result[key] as MarketGainer[]).map(mover => ({
+              ...mover,
+              price: String(convertCurrencySync(parseFloat(mover.price), sourceCurrency, targetCurrency).toFixed(2)),
+            }));
+          }
+        });
+      }
+
       setWidgetData(widget.id, { data: result, loading: false, error: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch data';
@@ -158,16 +233,16 @@ export function useWidgetData(widget: WidgetConfig) {
       console.warn(`Widget ${widget.id} (${widget.name}) error:`, sanitized);
       setWidgetError(widget.id, sanitized);
     }
-  }, [widget.id, widget.symbol, widget.type, widget.apiUrl, widget.apiProvider, widget.timeInterval, widget.selectedFields, widget.name, currentDashboardType, setWidgetData, setWidgetLoading, setWidgetError, scrubSecrets]);
+  }, [widget.id, widget.symbol, widget.type, widget.apiUrl, widget.apiProvider, widget.timeInterval, widget.selectedFields, widget.name, widget.currency, currentDashboardType, setWidgetData, setWidgetLoading, setWidgetError, scrubSecrets]);
 
   // Initial fetch and set up interval
   useEffect(() => {
     fetchData();
-    
+
     if (widget.refreshInterval > 0) {
       intervalRef.current = setInterval(fetchData, widget.refreshInterval * 1000);
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -178,23 +253,40 @@ export function useWidgetData(widget: WidgetConfig) {
   // WebSocket realtime updates for stock cards
   useEffect(() => {
     if (widget.type !== 'card' || !widget.symbol || !widget.enableWebSocket || widget.apiProvider !== 'finnhub') return;
+
     const unsubscribe = finnhubWS.subscribe(widget.symbol, (trade: WSTradeData) => {
+      let price = trade.p;
+      if (widget.currency && widget.currency !== 'USD') {
+        price = convertCurrencySync(price, 'USD', widget.currency);
+      }
+
+      const currentData = useDashboardStore.getState().widgetData[widget.id]?.data;
+      const currentQuote = currentData?.quote as StockQuote | undefined;
+
       const quote: StockQuote = {
         symbol: trade.s,
-        price: trade.p,
-        change: 0,
-        changePercent: 0,
-        high: trade.p,
-        low: trade.p,
-        open: trade.p,
-        previousClose: trade.p,
+        price,
+        change: currentQuote?.change ?? 0,
+        changePercent: currentQuote?.changePercent ?? 0,
+        high: Math.max(price, currentQuote?.high ?? price),
+        low: Math.min(price, currentQuote?.low ?? price),
+        open: currentQuote?.open ?? price,
+        previousClose: currentQuote?.previousClose ?? price,
         volume: trade.v,
-        latestTradingDay: new Date(trade.t).toISOString().split('T')[0],
+        latestTradingDay: currentQuote?.latestTradingDay || new Date(trade.t).toISOString().split('T')[0],
       };
-      setWidgetData(widget.id, { data: { quote }, loading: false, error: null });
+
+      setWidgetData(widget.id, {
+        data: {
+          ...currentData,
+          quote
+        },
+        loading: false,
+        error: null
+      });
     });
     return () => unsubscribe();
-  }, [widget.type, widget.symbol, widget.enableWebSocket, widget.apiProvider, widget.id, setWidgetData]);
+  }, [widget.type, widget.symbol, widget.enableWebSocket, widget.apiProvider, widget.id, widget.currency, setWidgetData]);
 
   const refetch = useCallback(() => {
     fetchData();
@@ -221,9 +313,9 @@ export function useStockQuote(symbol: string | undefined, refreshInterval = 30, 
 
   const fetchQuote = useCallback(async () => {
     if (!symbol) return;
-    
+
     setWidgetLoading(widgetId, true);
-    
+
     try {
       const quote = await getStockQuote(symbol);
       setWidgetData(widgetId, { data: { quote }, loading: false, error: null });
@@ -249,12 +341,12 @@ export function useStockQuote(symbol: string | undefined, refreshInterval = 30, 
   useEffect(() => {
     if (symbol) {
       fetchQuote();
-      
+
       if (refreshInterval > 0) {
         intervalRef.current = setInterval(fetchQuote, refreshInterval * 1000);
       }
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -263,7 +355,7 @@ export function useStockQuote(symbol: string | undefined, refreshInterval = 30, 
   }, [symbol, refreshInterval, fetchQuote]);
 
   const quote = data?.data?.quote as StockQuote | undefined;
-  
+
   return {
     quote: realtimePrice && quote ? { ...quote, price: realtimePrice } : quote,
     loading: data?.loading ?? true,
@@ -289,9 +381,9 @@ export function useTimeSeries(
 
   const fetchTimeSeries = useCallback(async () => {
     if (!symbol) return;
-    
+
     setWidgetLoading(widgetId, true);
-    
+
     try {
       const timeSeries = await getTimeSeries(symbol, interval);
       setWidgetData(widgetId, { data: { timeSeries }, loading: false, error: null });
@@ -304,12 +396,12 @@ export function useTimeSeries(
   useEffect(() => {
     if (symbol) {
       fetchTimeSeries();
-      
+
       if (refreshInterval > 0) {
         intervalRef.current = setInterval(fetchTimeSeries, refreshInterval * 1000);
       }
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -337,7 +429,7 @@ export function useMarketMovers(refreshInterval = 120) {
 
   const fetchMovers = useCallback(async () => {
     setWidgetLoading(widgetId, true);
-    
+
     try {
       const movers = await getTopGainersLosers();
       setWidgetData(widgetId, { data: movers, loading: false, error: null });
@@ -349,11 +441,11 @@ export function useMarketMovers(refreshInterval = 120) {
 
   useEffect(() => {
     fetchMovers();
-    
+
     if (refreshInterval > 0) {
       intervalRef.current = setInterval(fetchMovers, refreshInterval * 1000);
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

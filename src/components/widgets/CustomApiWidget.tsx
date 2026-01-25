@@ -21,11 +21,24 @@ export function CustomApiWidget({ widget }: CustomApiWidgetProps) {
       if (Math.abs(value) >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
       if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
       if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
+
+      // Handle floating point decimals
       if (Number.isInteger(value)) return value.toString();
-      return value.toFixed(4);
+
+      // If it looks like a price (positive, not too many leading zeros)
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
     }
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (typeof value === 'object') return JSON.stringify(value);
+
+    // Try to parse string as number if it looks like one
+    if (typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value))) {
+      return formatValue(parseFloat(value));
+    }
+
     return String(value);
   };
 

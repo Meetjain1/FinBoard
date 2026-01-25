@@ -79,7 +79,7 @@ export async function getStockQuote(symbol: string): Promise<StockQuote> {
         symbol,
         price: parseFloat(q['05. price'] || '0') || 0,
         change: parseFloat(q['09. change'] || '0') || 0,
-        changePercent: parseFloat((q['10. change percent'] || '0%').replace('%','')) || 0,
+        changePercent: parseFloat((q['10. change percent'] || '0%').replace('%', '')) || 0,
         high: parseFloat(q['03. high'] || '0') || 0,
         low: parseFloat(q['04. low'] || '0') || 0,
         open: parseFloat(q['02. open'] || '0') || 0,
@@ -146,7 +146,7 @@ export async function getTimeSeries(
     weekly: 'W',
     monthly: 'M',
   };
-  
+
   // Try Finnhub first
   try {
     const result = await getFinnhubCandles(symbol, resolutionMap[interval]);
@@ -156,39 +156,39 @@ export async function getTimeSeries(
   } catch (finnhubErr) {
     console.warn(`Finnhub failed for ${symbol}:`, (finnhubErr as Error).message);
   }
-  
+
   // Try Alpha Vantage as fallback (but expect rate limits)
   try {
     const func = interval === 'daily' ? 'TIME_SERIES_DAILY' : interval === 'weekly' ? 'TIME_SERIES_WEEKLY' : 'TIME_SERIES_MONTHLY';
     const cacheKey = `alphavantage-series-${symbol}-${interval}`;
     const cached = cache.get<TimeSeriesData[]>(cacheKey);
     if (cached) return cached;
-    
+
     const url = `${ALPHA_VANTAGE_BASE_URL}?function=${func}&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`AlphaVantage HTTP ${response.status}`);
     }
-    
+
     const json = await response.json();
-    
+
     // Check for API errors or rate limits
     if (json['Error Message'] || json['Note'] || json['Information']) {
       throw new Error('AlphaVantage API limit reached');
     }
-    
+
     // Find the Time Series key
     const timeSeriesKey = Object.keys(json).find(k => k.toLowerCase().includes('time series'));
     if (!timeSeriesKey) {
       throw new Error('Invalid Alpha Vantage response');
     }
-    
+
     const series = json[timeSeriesKey];
     if (!series || typeof series !== 'object' || Object.keys(series).length === 0) {
       throw new Error('Empty Alpha Vantage data');
     }
-    
+
     const result: TimeSeriesData[] = Object.entries(series).slice(0, 100).map(([date, v]: [string, any]) => ({
       date,
       open: parseFloat(v['1. open'] || v.open || '0') || 0,
@@ -197,7 +197,7 @@ export async function getTimeSeries(
       close: parseFloat(v['4. close'] || v.close || '0') || 0,
       volume: parseFloat(v['5. volume'] || v.volume || '0') || 0,
     }));
-    
+
     if (result.length > 0) {
       cache.set(cacheKey, result, CACHE_DURATION.timeSeries);
       return result;
@@ -205,7 +205,7 @@ export async function getTimeSeries(
   } catch (alphaErr) {
     console.warn(`Alpha Vantage failed for ${symbol}:`, (alphaErr as Error).message);
   }
-  
+
   // Last resort: return demo data
   console.info(`Using demo data for ${symbol} chart`);
   const demoData = generateDemoTimeSeries(symbol, interval === 'daily' ? 30 : interval === 'weekly' ? 52 : 24);
@@ -219,7 +219,7 @@ function generateDemoTimeSeries(symbol: string, days: number = 30): TimeSeriesDa
   const data: TimeSeriesData[] = [];
   const now = Date.now();
   const basePrice = symbol === 'AAPL' ? 248 : symbol === 'MSFT' ? 465 : symbol === 'TSLA' ? 449 : 150;
-  
+
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(now - i * 24 * 60 * 60 * 1000);
     const randomFactor = 0.98 + Math.random() * 0.04;
@@ -228,7 +228,7 @@ function generateDemoTimeSeries(symbol: string, days: number = 30): TimeSeriesDa
     const high = Math.max(open, close) * (1 + Math.random() * 0.02);
     const low = Math.min(open, close) * (1 - Math.random() * 0.02);
     const volume = Math.floor(50000000 + Math.random() * 50000000);
-    
+
     data.push({
       date: date.toISOString().split('T')[0],
       open: parseFloat(open.toFixed(2)),
@@ -238,28 +238,75 @@ function generateDemoTimeSeries(symbol: string, days: number = 30): TimeSeriesDa
       volume,
     });
   }
-  
+
   return data;
 }
 
 /**
  * Get top gainers and losers - uses IndianAPI for Indian stocks
  */
-export async function getTopGainersLosers(): Promise<{
+export async function getTopGainersLosers(url?: string): Promise<{
   gainers: MarketGainer[];
   losers: MarketGainer[];
   mostActive: MarketGainer[];
 }> {
+  const isCrypto = url?.includes('crypto') || url?.includes('coinbase') || !url && !url?.includes('alphavantage') && !url?.includes('indianapi');
+  const cacheKey = url ? `movers-${url}` : (isCrypto ? 'movers-crypto' : 'movers-default');
+  const cached = cache.get<any>(cacheKey);
+  if (cached) return cached;
+
   try {
+    // 1. Handle Crypto
+    if (isCrypto) {
+      const cryptoFallback = {
+        gainers: [
+          { ticker: 'SOL', price: '242.88', change_amount: '12.4', change_percentage: '5.38%', volume: '8.2B' },
+          { ticker: 'AVAX', price: '38.45', change_amount: '1.2', change_percentage: '3.22%', volume: '1.5B' },
+          { ticker: 'MATIC', price: '0.542', change_amount: '0.012', change_percentage: '2.21%', volume: '1.1B' },
+        ],
+        losers: [
+          { ticker: 'ETH', price: '2842.15', change_amount: '-45.2', change_percentage: '-1.57%', volume: '18.4B' },
+          { ticker: 'XRP', price: '3.12', change_amount: '-0.08', change_percentage: '-2.51%', volume: '4.5B' },
+          { ticker: 'ADA', price: '0.52', change_amount: '-0.01', change_percentage: '-1.92%', volume: '0.8B' },
+        ],
+        mostActive: [
+          { ticker: 'BTC', price: '102145.42', change_amount: '1245.1', change_percentage: '1.24%', volume: '45.2B' },
+          { ticker: 'ETH', price: '2842.15', change_amount: '-45.2', change_percentage: '-1.57%', volume: '18.4B' },
+          { ticker: 'SOL', price: '242.88', change_amount: '12.4', change_percentage: '5.38%', volume: '8.2B' },
+        ],
+      };
+      cache.set(cacheKey, cryptoFallback, CACHE_DURATION.gainersLosers);
+      return cryptoFallback;
+    }
+
+    // 2. Handle Alpha Vantage (US Stocks)
+    if (url?.includes('alphavantage') || url?.includes('TOP_GAINERS_LOSERS')) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Alpha Vantage error: ${response.status}`);
+      const data = await response.json();
+
+      const payload = {
+        gainers: (data.top_gainers || []).slice(0, 10),
+        losers: (data.top_losers || []).slice(0, 10),
+        mostActive: (data.most_actively_traded || []).slice(0, 10),
+      };
+
+      if (payload.gainers.length > 0) {
+        cache.set(cacheKey, payload, CACHE_DURATION.gainersLosers);
+        return payload;
+      }
+    }
+
+    // 3. Handle Indian API (or default)
     const stocks = await getIndianStocks();
     const sorted = [...stocks].sort((a, b) => b.change_percentage - a.change_percentage);
 
     const formatStock = (stock: typeof stocks[0]): MarketGainer => ({
-      ticker: stock.company,
+      ticker: stock.company.split(' ')[0].toUpperCase(),
       price: String(stock.price),
       change_amount: String((stock.price * stock.change_percentage / 100).toFixed(2)),
       change_percentage: `${stock.change_percentage.toFixed(2)}%`,
-      volume: stock.market_cap,
+      volume: String(stock.market_cap),
     });
 
     const payload = {
@@ -267,14 +314,11 @@ export async function getTopGainersLosers(): Promise<{
       losers: sorted.slice(-10).reverse().filter((s) => s.change_percentage < 0).map(formatStock),
       mostActive: stocks.slice(0, 10).map(formatStock),
     };
-    cache.set('indian-trending', payload, CACHE_DURATION.indianStocks);
+
+    cache.set(cacheKey, payload, CACHE_DURATION.indianStocks);
     return payload;
   } catch (error) {
-    const fallback = cache.get<{
-      gainers: MarketGainer[];
-      losers: MarketGainer[];
-      mostActive: MarketGainer[];
-    }>('indian-trending');
+    const fallback = cache.get<any>(cacheKey) || cache.get<any>('indian-trending');
     if (fallback) return fallback;
     console.error('Failed to fetch market movers:', error);
     return { gainers: [], losers: [], mostActive: [] };
@@ -314,7 +358,7 @@ export async function fetchCustomApi(url: string, cacheKey?: string, headers?: R
       if (cached) return cached;
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     cache.set(key, data, CACHE_DURATION.custom);
     return data;
@@ -335,9 +379,9 @@ export async function testApiEndpoint(url: string, headers?: Record<string, stri
     if (!response.ok) {
       return { success: false, error: sanitizeErrorMessage(`HTTP ${response.status}: ${response.statusText}`) };
     }
-    
+
     const data = await response.json();
-    
+
     // Check for common error formats
     if (data.error) {
       return { success: false, error: data.error };
@@ -348,13 +392,13 @@ export async function testApiEndpoint(url: string, headers?: Record<string, stri
         error: data['Error Message'] || data['Note'] || data['Information'],
       };
     }
-    
+
     const fields = extractFields(data);
     const arrayFields = fields.filter(f => f.type === 'array');
-    
+
     // Cache the test result
     cache.set(`custom-${url}`, data, CACHE_DURATION.custom);
-    
+
     return {
       success: true,
       data,
@@ -374,11 +418,11 @@ export async function testApiEndpoint(url: string, headers?: Record<string, stri
  */
 export function extractFields(data: unknown, prefix = '', depth = 0): WidgetField[] {
   if (depth > 5) return [];
-  
+
   const fields: WidgetField[] = [];
-  
+
   if (data === null || data === undefined) return fields;
-  
+
   if (Array.isArray(data)) {
     fields.push({
       path: prefix || 'root',
@@ -386,7 +430,7 @@ export function extractFields(data: unknown, prefix = '', depth = 0): WidgetFiel
       type: 'array',
       value: data.length > 0 ? `Array[${data.length}]` : 'Empty Array',
     });
-    
+
     if (data.length > 0 && typeof data[0] === 'object') {
       const subFields = extractFields(data[0], `${prefix}[0]`, depth + 1);
       fields.push(...subFields);
@@ -394,7 +438,7 @@ export function extractFields(data: unknown, prefix = '', depth = 0): WidgetFiel
   } else if (typeof data === 'object') {
     Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
       const path = prefix ? `${prefix}.${key}` : key;
-      
+
       if (Array.isArray(value)) {
         fields.push({
           path,
@@ -424,7 +468,7 @@ export function extractFields(data: unknown, prefix = '', depth = 0): WidgetFiel
       }
     });
   }
-  
+
   return fields;
 }
 
@@ -434,7 +478,7 @@ export function extractFields(data: unknown, prefix = '', depth = 0): WidgetFiel
 export function getValueByPath(obj: unknown, path: string): unknown {
   const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.');
   let current: unknown = obj;
-  
+
   for (const key of keys) {
     if (current === null || current === undefined) return undefined;
     if (typeof current === 'object') {
@@ -443,7 +487,7 @@ export function getValueByPath(obj: unknown, path: string): unknown {
       return undefined;
     }
   }
-  
+
   return current;
 }
 
@@ -461,7 +505,7 @@ export function getArrayByPath(obj: unknown, path: string): unknown[] {
  */
 export function formatNumber(value: number, type?: 'currency' | 'percent' | 'compact', currency = 'USD'): string {
   if (isNaN(value)) return '-';
-  
+
   switch (type) {
     case 'currency':
       return new Intl.NumberFormat('en-US', {

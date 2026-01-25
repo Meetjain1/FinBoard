@@ -38,7 +38,8 @@ export function EditWidgetDialog() {
   const [chartType, setChartType] = useState<ChartType>('line');
   const [timeInterval, setTimeInterval] = useState<TimeInterval>('daily');
   const [currency, setCurrency] = useState('USD');
-  const [cardLayout, setCardLayout] = useState<'single' | 'list'>('single');
+  const [cardLayout, setCardLayout] = useState<'single' | 'list' | 'movers'>('single');
+  const [apiUrl, setApiUrl] = useState('');
 
   useEffect(() => {
     if (editingWidget) {
@@ -49,6 +50,7 @@ export function EditWidgetDialog() {
       setTimeInterval(editingWidget.timeInterval || 'daily');
       setCurrency(editingWidget.currency || 'USD');
       setCardLayout(editingWidget.cardLayout || 'single');
+      setApiUrl(editingWidget.apiUrl || '');
     }
   }, [editingWidget]);
 
@@ -61,8 +63,9 @@ export function EditWidgetDialog() {
       refreshInterval,
       chartType: editingWidget.type === 'chart' ? chartType : undefined,
       timeInterval: editingWidget.type === 'chart' ? timeInterval : undefined,
-      currency: editingWidget.type === 'card' ? currency : undefined,
+      currency: currency,
       cardLayout: editingWidget.type === 'card' ? cardLayout : undefined,
+      apiUrl: apiUrl || editingWidget.apiUrl,
     });
 
     setEditingWidget(null);
@@ -70,7 +73,10 @@ export function EditWidgetDialog() {
       title: 'Widget Updated',
       description: 'Your widget configuration has been saved.',
     });
-  }, [editingWidget, name, symbol, refreshInterval, chartType, timeInterval, currency, cardLayout, updateWidget, setEditingWidget, toast]);
+  }, [editingWidget, name, symbol, refreshInterval, chartType, timeInterval, currency, cardLayout, apiUrl, updateWidget, setEditingWidget, toast]);
+
+  const isMovers = editingWidget?.cardLayout === 'movers';
+  const isCustomWidget = (editingWidget?.apiProvider === 'custom' || (editingWidget?.selectedFields && editingWidget.selectedFields.length > 0)) && !isMovers;
 
   return (
     <Dialog open={!!editingWidget} onOpenChange={(open) => !open && setEditingWidget(null)}>
@@ -100,89 +106,90 @@ export function EditWidgetDialog() {
               />
             </div>
 
-            {editingWidget.type === 'card' && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-symbol">Stock Symbol</Label>
+            {/* API URL for Custom Widgets */}
+            {isCustomWidget && (
+              <div className="grid gap-2">
+                <Label htmlFor="edit-url">API Endpoint URL</Label>
+                <Input
+                  id="edit-url"
+                  value={apiUrl}
+                  onChange={(e) => setApiUrl(e.target.value)}
+                  placeholder="https://api.example.com/data"
+                />
+              </div>
+            )}
+
+            {!isMovers && (editingWidget.type === 'card' || editingWidget.type === 'chart') && (
+              <div className="grid gap-2">
+                <Label htmlFor="edit-symbol">Symbol (e.g. BTC, AAPL)</Label>
+                <div className="flex gap-2">
                   <Select value={symbol} onValueChange={setSymbol}>
-                    <SelectTrigger id="edit-symbol">
-                      <SelectValue />
+                    <SelectTrigger id="edit-symbol" className="flex-1">
+                      <SelectValue placeholder="Select symbol" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(currentDashboardType === 'crypto' ? POPULAR_CRYPTO : currentDashboardType === 'indian-market' ? INDIAN_SYMBOLS : POPULAR_SYMBOLS).map((s) => (
+                      {(editingWidget.apiProvider === 'crypto' || currentDashboardType === 'crypto' ? POPULAR_CRYPTO : editingWidget.apiProvider === 'indianapi' || currentDashboardType === 'indian-market' ? INDIAN_SYMBOLS : POPULAR_SYMBOLS).map((s) => (
                         <SelectItem key={s.symbol} value={s.symbol}>
                           {s.symbol} - {s.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <Input
+                    className="w-[100px]"
+                    placeholder="Manual"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  />
                 </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-currency">Currency</Label>
-                  <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger id="edit-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                          {c.symbol} {c.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+              </div>
             )}
 
+            <div className="grid gap-2">
+              <Label htmlFor="edit-currency">Currency Display</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="edit-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.symbol} {c.code} - {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {editingWidget.type === 'chart' && (
-              <>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-chart-symbol">Stock Symbol</Label>
-                  <Select value={symbol} onValueChange={setSymbol}>
-                    <SelectTrigger id="edit-chart-symbol">
+                  <Label htmlFor="edit-chart-type">Chart Type</Label>
+                  <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
+                    <SelectTrigger id="edit-chart-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(currentDashboardType === 'crypto' ? POPULAR_CRYPTO : currentDashboardType === 'indian-market' ? INDIAN_SYMBOLS : POPULAR_SYMBOLS).map((s) => (
-                        <SelectItem key={s.symbol} value={s.symbol}>
-                          {s.symbol}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="line">Line</SelectItem>
+                      <SelectItem value="candlestick">Candlestick</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-chart-type">Chart Type</Label>
-                    <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
-                      <SelectTrigger id="edit-chart-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="line">Line</SelectItem>
-                        <SelectItem value="candlestick">Candlestick</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-interval">Time Interval</Label>
-                    <Select value={timeInterval} onValueChange={(v) => setTimeInterval(v as TimeInterval)}>
-                      <SelectTrigger id="edit-interval">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-interval">Time Interval</Label>
+                  <Select value={timeInterval} onValueChange={(v) => setTimeInterval(v as TimeInterval)}>
+                    <SelectTrigger id="edit-interval">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </>
+              </div>
             )}
 
             <div className="grid gap-2">

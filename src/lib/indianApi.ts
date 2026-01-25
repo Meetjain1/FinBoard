@@ -103,7 +103,12 @@ async function fetchIndianApi(endpoint: string, cacheKey?: string): Promise<unkn
   if (cached) return cached;
 
   if (endpoint.includes('trending')) {
-    return { stocks: FALLBACK_INDIAN_STOCKS };
+    return {
+      trending_stocks: {
+        top_gainers: FALLBACK_INDIAN_STOCKS.slice(0, 3),
+        top_losers: FALLBACK_INDIAN_STOCKS.slice(3, 6)
+      }
+    };
   }
 
   // Try to find a matching stock in fallback data based on the query parameter
@@ -235,16 +240,20 @@ export async function getIndianStocks(): Promise<Array<{
 
   try {
     const data = await fetchIndianApi('/trending', cacheKey) as Record<string, unknown>;
+
+    // Robust mapping for varying API structures
     const trending = (data as Record<string, unknown>).trending_stocks as Record<string, unknown> | undefined;
-    const gainers = (trending?.top_gainers as Array<Record<string, unknown>>) || [];
-    const losers = (trending?.top_losers as Array<Record<string, unknown>>) || [];
-    const combined = [...gainers, ...losers];
+    const gainers = (trending?.top_gainers || data.top_gainers || data.gainers || []) as Array<Record<string, unknown>>;
+    const losers = (trending?.top_losers || data.top_losers || data.losers || []) as Array<Record<string, unknown>>;
+    const stocks = (data.stocks || data.data || (Array.isArray(data) ? data : [])) as Array<Record<string, unknown>>;
+
+    const combined = [...gainers, ...losers, ...stocks];
 
     const mapped = combined.map((item) => ({
-      company: (item.company_name || item.company || item.ticker_id || item.ticker || 'N/A') as string,
+      company: (item.company_name || item.name || item.company || item.ticker_id || item.ticker || 'N/A') as string,
       price: parseFloat(String(item.price ?? item.last_price ?? 0)),
-      change_percentage: parseFloat(String(item.percent_change ?? item.change_percentage ?? item.net_change ?? 0)),
-      sector: (item.industry || 'N/A') as string,
+      change_percentage: parseFloat(String(item.percent_change ?? item.change_percentage ?? item.net_change ?? item.change ?? 0)),
+      sector: (item.industry || item.sector || 'N/A') as string,
       market_cap: String(item.market_cap || item.volume || 'N/A'),
       pe_ratio: parseFloat(String(item.pe_ratio || 0)),
       week_52_high: parseFloat(String(item.year_high || item['52_week_high'] || 0)),

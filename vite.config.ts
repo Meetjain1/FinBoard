@@ -10,6 +10,18 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/api-indian': {
+        target: 'https://api.indianapi.in',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-indian/, ''),
+      },
+      '/proxy-indian': {
+        target: 'https://indianapi.in',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/proxy-indian/, ''),
+      }
+    }
   },
   plugins: [react()],
   resolve: {

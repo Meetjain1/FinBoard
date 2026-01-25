@@ -37,7 +37,7 @@ export interface WidgetConfig {
   arrayPath?: string; // Path to array data for table display
   enableWebSocket?: boolean; // Enable real-time WebSocket updates
   dashboardType?: string; // Track which dashboard this widget belongs to
-  cardLayout?: 'single' | 'list'; // For card layout selection
+  cardLayout?: 'single' | 'list' | 'movers'; // For card layout selection
   position: {
     x: number;
     y: number;

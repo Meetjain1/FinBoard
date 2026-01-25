@@ -10,21 +10,28 @@ export const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || '';
 export const FINNHUB_BASE_URL = import.meta.env.VITE_FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
 export const FINNHUB_WS_URL = import.meta.env.VITE_FINNHUB_WS_URL || 'wss://ws.finnhub.io';
 
+const isDev = import.meta.env.DEV;
+
 // IndianAPI Configuration (Higher rate limits for Indian stocks)
 export const INDIAN_API_KEY = import.meta.env.VITE_INDIAN_API_KEY || '';
-export const INDIAN_API_BASE_URL = (import.meta.env.VITE_INDIAN_API_BASE_URL || 'https://api.indianapi.in').replace(/\/$/, '');
-export const INDIAN_API_FALLBACK_BASES = [
-  INDIAN_API_BASE_URL,
-  'https://indianapi.in/api',
-  'https://indianapi.in/api/v1',
-];
+export const INDIAN_API_BASE_URL = isDev
+  ? '/api-indian'
+  : (import.meta.env.VITE_INDIAN_API_BASE_URL || 'https://api.indianapi.in').replace(/\/$/, '');
+
+export const INDIAN_API_FALLBACK_BASES = isDev
+  ? ['/api-indian', '/proxy-indian/api', '/proxy-indian/api/v1']
+  : [
+    INDIAN_API_BASE_URL,
+    'https://indianapi.in/api',
+    'https://indianapi.in/api/v1',
+  ];
 
 // Alpha Vantage API Configuration (Fallback - 5 calls/minute)
 export const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || '';
 export const ALPHA_VANTAGE_BASE_URL = import.meta.env.VITE_ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
 
 // API Provider Types
-export type ApiProvider = 'finnhub' | 'indianapi' | 'alphavantage' | 'custom';
+export type ApiProvider = 'finnhub' | 'indianapi' | 'alphavantage' | 'crypto' | 'custom';
 
 // API Rate Limiting (per provider)
 export const API_RATE_LIMITS = {
@@ -260,7 +267,7 @@ export const STORAGE_KEYS = {
 export const API_ENDPOINTS = {
   finnhub: {
     quote: (symbol: string) => `${FINNHUB_BASE_URL}/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`,
-    candles: (symbol: string, resolution: string, from: number, to: number) => 
+    candles: (symbol: string, resolution: string, from: number, to: number) =>
       `${FINNHUB_BASE_URL}/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`,
     news: () => `${FINNHUB_BASE_URL}/news?category=general&token=${FINNHUB_API_KEY}`,
     marketStatus: () => `${FINNHUB_BASE_URL}/stock/market-status?exchange=US&token=${FINNHUB_API_KEY}`,

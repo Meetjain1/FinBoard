@@ -34,7 +34,7 @@ export function StockQuoteWidget({ widget }: StockQuoteWidgetProps) {
           <div className="flex items-end justify-between">
             <div>
               <p className="font-mono text-3xl font-bold text-foreground">
-                {formatNumber(quote.price, 'currency')}
+                {formatNumber(quote.price, 'currency', widget.currency)}
               </p>
               <div className={`flex items-center gap-1 mt-1 ${isPositive ? 'text-gain' : 'text-loss'}`}>
                 {isPositive ? (
@@ -43,7 +43,7 @@ export function StockQuoteWidget({ widget }: StockQuoteWidgetProps) {
                   <TrendingDown className="h-4 w-4" />
                 )}
                 <span className="font-mono text-sm font-medium">
-                  {isPositive ? '+' : ''}{formatNumber(quote.change)} ({formatNumber(quote.changePercent, 'percent')})
+                  {isPositive ? '+' : ''}{formatNumber(quote.change, 'currency', widget.currency)} ({formatNumber(quote.changePercent, 'percent')})
                 </span>
               </div>
             </div>
@@ -58,10 +58,10 @@ export function StockQuoteWidget({ widget }: StockQuoteWidgetProps) {
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-2 gap-3">
-            <MetricItem label="Open" value={formatNumber(quote.open, 'currency')} />
-            <MetricItem label="High" value={formatNumber(quote.high, 'currency')} />
-            <MetricItem label="Low" value={formatNumber(quote.low, 'currency')} />
-            <MetricItem label="Prev Close" value={formatNumber(quote.previousClose, 'currency')} />
+            <MetricItem label="Open" value={formatNumber(quote.open, 'currency', widget.currency)} />
+            <MetricItem label="High" value={formatNumber(quote.high, 'currency', widget.currency)} />
+            <MetricItem label="Low" value={formatNumber(quote.low, 'currency', widget.currency)} />
+            <MetricItem label="Prev Close" value={formatNumber(quote.previousClose, 'currency', widget.currency)} />
           </div>
 
           {/* Volume */}

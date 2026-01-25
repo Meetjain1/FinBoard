@@ -32,21 +32,21 @@ type ChartView = 'line' | 'area' | 'candlestick';
 export function StockChartWidget({ widget }: StockChartWidgetProps) {
   const { data, loading, error, lastFetched, refetch } = useWidgetData(widget);
   const [chartView, setChartView] = useState<ChartView>(widget.chartType === 'candlestick' ? 'candlestick' : 'area');
-  
+
   // Extract timeSeries from various possible data structures
   const timeSeries = useMemo(() => {
     if (!data) return undefined;
-    
+
     // Direct array
     if (Array.isArray(data)) {
       return data.filter(item => item && typeof item === 'object' && 'close' in item) as TimeSeriesData[];
     }
-    
+
     // Nested in timeSeries property
     if (data.timeSeries && Array.isArray(data.timeSeries)) {
       return data.timeSeries.filter(item => item && typeof item === 'object' && 'close' in item) as TimeSeriesData[];
     }
-    
+
     // Alpha Vantage format: Time Series (Daily) or similar
     const tsKeys = Object.keys(data).filter(k => k.toLowerCase().includes('time series'));
     if (tsKeys.length > 0) {
@@ -63,7 +63,7 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
         return entries;
       }
     }
-    
+
     return undefined;
   }, [data]);
 
@@ -97,15 +97,15 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">High:</span>
-              <span className="font-mono text-gain">{formatNumber(data.high, 'currency')}</span>
+              <span className="font-mono text-gain">{formatNumber(data.high, 'currency', widget.currency)}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Low:</span>
-              <span className="font-mono text-loss">{formatNumber(data.low, 'currency')}</span>
+              <span className="font-mono text-loss">{formatNumber(data.low, 'currency', widget.currency)}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Close:</span>
-              <span className="font-mono font-medium">{formatNumber(data.close, 'currency')}</span>
+              <span className="font-mono font-medium">{formatNumber(data.close, 'currency', widget.currency)}</span>
             </div>
           </div>
         </div>
@@ -142,7 +142,7 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
               {priceChange && (
                 <div className={priceChange.isPositive ? 'text-gain' : 'text-loss'}>
                   <span className="font-mono text-lg font-semibold">
-                    {priceChange.isPositive ? '+' : ''}{formatNumber(priceChange.change, 'currency')}
+                    {priceChange.isPositive ? '+' : ''}{formatNumber(priceChange.change, 'currency', widget.currency)}
                   </span>
                   <span className="ml-2 text-sm">
                     ({formatNumber(priceChange.percentChange, 'percent')})
@@ -161,9 +161,8 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
                   key={view}
                   variant="ghost"
                   size="sm"
-                  className={`h-7 px-2 text-xs capitalize ${
-                    chartView === view ? 'bg-background shadow-sm' : ''
-                  }`}
+                  className={`h-7 px-2 text-xs capitalize ${chartView === view ? 'bg-background shadow-sm' : ''
+                    }`}
                   onClick={() => setChartView(view)}
                 >
                   {view}
@@ -203,7 +202,7 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
                     tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    tickFormatter={(value) => formatNumber(value, 'compact', widget.currency)}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Area
@@ -228,7 +227,7 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
                     tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    tickFormatter={(value) => formatNumber(value, 'compact', widget.currency)}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Line
@@ -254,7 +253,7 @@ export function StockChartWidget({ widget }: StockChartWidgetProps) {
                     tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    tickFormatter={(value) => formatNumber(value, 'compact', widget.currency)}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Line
