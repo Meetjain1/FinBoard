@@ -64,6 +64,16 @@ export const POPULAR_SYMBOLS = [
   { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'US' },
   { symbol: 'V', name: 'Visa Inc.', exchange: 'US' },
   { symbol: 'WMT', name: 'Walmart Inc.', exchange: 'US' },
+  { symbol: 'PG', name: 'Procter & Gamble Co.', exchange: 'US' },
+  { symbol: 'DIS', name: 'Walt Disney Co.', exchange: 'US' },
+  { symbol: 'NFLX', name: 'Netflix Inc.', exchange: 'US' },
+  { symbol: 'ADBE', name: 'Adobe Inc.', exchange: 'US' },
+  { symbol: 'CRM', name: 'Salesforce Inc.', exchange: 'US' },
+  { symbol: 'KO', name: 'Coca-Cola Co.', exchange: 'US' },
+  { symbol: 'PEP', name: 'PepsiCo Inc.', exchange: 'US' },
+  { symbol: 'NKE', name: 'NIKE Inc.', exchange: 'US' },
+  { symbol: 'CSCO', name: 'Cisco Systems Inc.', exchange: 'US' },
+  { symbol: 'INTC', name: 'Intel Corporation', exchange: 'US' },
 ];
 
 // Popular crypto assets
@@ -73,6 +83,16 @@ export const POPULAR_CRYPTO = [
   { symbol: 'SOL', name: 'Solana' },
   { symbol: 'MATIC', name: 'Polygon' },
   { symbol: 'XRP', name: 'XRP' },
+  { symbol: 'ADA', name: 'Cardano' },
+  { symbol: 'AVAX', name: 'Avalanche' },
+  { symbol: 'DOT', name: 'Polkadot' },
+  { symbol: 'DOGE', name: 'Dogecoin' },
+  { symbol: 'SHIB', name: 'Shiba Inu' },
+  { symbol: 'LINK', name: 'Chainlink' },
+  { symbol: 'TRX', name: 'TRON' },
+  { symbol: 'LTC', name: 'Litecoin' },
+  { symbol: 'BCH', name: 'Bitcoin Cash' },
+  { symbol: 'UNI', name: 'Uniswap' },
 ];
 
 // Popular Indian Stock Symbols
@@ -87,6 +107,16 @@ export const INDIAN_SYMBOLS = [
   { symbol: 'BHARTIARTL', name: 'Bharti Airtel', exchange: 'NSE' },
   { symbol: 'ITC', name: 'ITC Limited', exchange: 'NSE' },
   { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', exchange: 'NSE' },
+  { symbol: 'LT', name: 'Larsen & Toubro', exchange: 'NSE' },
+  { symbol: 'AXISBANK', name: 'Axis Bank', exchange: 'NSE' },
+  { symbol: 'ASIANPAINT', name: 'Asian Paints', exchange: 'NSE' },
+  { symbol: 'MARUTI', name: 'Maruti Suzuki', exchange: 'NSE' },
+  { symbol: 'TITAN', name: 'Titan Company', exchange: 'NSE' },
+  { symbol: 'BAJFINANCE', name: 'Bajaj Finance', exchange: 'NSE' },
+  { symbol: 'SUNPHARMA', name: 'Sun Pharma', exchange: 'NSE' },
+  { symbol: 'ULTRACEMCO', name: 'UltraTech Cement', exchange: 'NSE' },
+  { symbol: 'HCLTECH', name: 'HCL Technologies', exchange: 'NSE' },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors', exchange: 'NSE' },
 ];
 
 // Currency Options

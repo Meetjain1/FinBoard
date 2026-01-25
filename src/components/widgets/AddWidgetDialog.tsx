@@ -1,6 +1,5 @@
 /**
- * Add Widget Dialog - Simplified to 3 main widget types
- * Finance Cards | Charts | Table
+ * Add Widget Dialog - Expanded with more stock options and quick-add buttons
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -36,9 +35,7 @@ import {
   X,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/dashboardStore';
-import { testApiEndpoint } from '@/lib/api';
-import { convertCurrencySync } from '@/lib/currency';
-import { POPULAR_SYMBOLS, INDIAN_SYMBOLS, POPULAR_CRYPTO, ALPHA_VANTAGE_BASE_URL, ALPHA_VANTAGE_API_KEY, CURRENCIES } from '@/lib/constants';
+import { ALPHA_VANTAGE_BASE_URL, ALPHA_VANTAGE_API_KEY, CURRENCIES, POPULAR_SYMBOLS, INDIAN_SYMBOLS, POPULAR_CRYPTO } from '@/lib/constants';
 import type { WidgetConfig, WidgetType, WidgetField, ChartType, TimeInterval } from '@/types/widget';
 import { useToast } from '@/hooks/use-toast';
 
@@ -51,7 +48,7 @@ export function AddWidgetDialog() {
   const [widgetType, setWidgetType] = useState<WidgetType>('card');
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('AAPL');
-  const [symbols, setSymbols] = useState<string[]>(['AAPL']);
+  const [symbols, setSymbols] = useState<string[]>([]);
   const [apiUrl, setApiUrl] = useState('');
   const [refreshInterval, setRefreshInterval] = useState(60);
   const [chartType, setChartType] = useState<ChartType>('line');
@@ -74,18 +71,20 @@ export function AddWidgetDialog() {
   const isMovers = widgetType === 'card' && cardLayout === 'movers';
 
   useEffect(() => {
-    if (currentDashboardType === 'crypto') {
-      setSymbol('BTC');
-      setSymbols(['BTC', 'ETH', 'SOL']);
-      setCardLayout('list');
-    } else if (currentDashboardType === 'indian-market') {
-      setSymbol('RELIANCE');
-      setSymbols(['RELIANCE', 'TCS', 'INFY']);
-      setCardLayout('single');
-    } else {
-      setSymbol('AAPL');
-      setSymbols(['AAPL']);
-      setCardLayout('single');
+    if (isAddWidgetOpen) {
+      if (currentDashboardType === 'crypto') {
+        setSymbol('BTC');
+        setSymbols(['BTC', 'ETH', 'SOL']);
+        setCardLayout('list');
+      } else if (currentDashboardType === 'indian-market') {
+        setSymbol('RELIANCE');
+        setSymbols(['RELIANCE', 'TCS', 'INFY']);
+        setCardLayout('single');
+      } else {
+        setSymbol('AAPL');
+        setSymbols(['AAPL', 'MSFT', 'GOOGL']);
+        setCardLayout('single');
+      }
     }
   }, [currentDashboardType, isAddWidgetOpen]);
 
@@ -93,10 +92,8 @@ export function AddWidgetDialog() {
     setStep('type');
     setWidgetType('card');
     setName('');
-    const defaultSymbol = currentDashboardType === 'crypto' ? 'BTC' : currentDashboardType === 'indian-market' ? 'RELIANCE' : 'AAPL';
-    const defaultSymbols = currentDashboardType === 'crypto' ? ['BTC', 'ETH', 'SOL'] : currentDashboardType === 'indian-market' ? ['RELIANCE', 'TCS', 'INFY'] : ['AAPL'];
-    setSymbol(defaultSymbol);
-    setSymbols(defaultSymbols);
+    setSymbol(currentDashboardType === 'crypto' ? 'BTC' : currentDashboardType === 'indian-market' ? 'RELIANCE' : 'AAPL');
+    setSymbols([]);
     setApiUrl('');
     setRefreshInterval(60);
     setChartType('line');
@@ -128,6 +125,7 @@ export function AddWidgetDialog() {
     const sym = symbol.toUpperCase().trim();
     if (sym && !symbols.includes(sym)) {
       setSymbols((prev) => [...prev, sym]);
+      setSymbol('');
     }
   }, [symbol, symbols]);
 
@@ -170,7 +168,7 @@ export function AddWidgetDialog() {
       selectedFields: selectedFields.length > 0 ? selectedFields : [],
       chartType: resolvedType === 'chart' ? chartType : undefined,
       timeInterval: resolvedType === 'chart' ? timeInterval : undefined,
-      symbol: (resolvedType === 'card' || resolvedType === 'chart') ? primarySymbol : undefined,
+      symbol: (resolvedType === 'card' || resolvedType === 'chart') ? (primarySymbol as string) : undefined,
       symbols: (resolvedType === 'watchlist' || resolvedType === 'table') ? (finalSymbols as string[]) : undefined,
       currency,
       cardLayout: resolvedType === 'card' ? cardLayout : undefined,
@@ -197,6 +195,8 @@ export function AddWidgetDialog() {
     return field.path.toLowerCase().includes(fieldSearch.toLowerCase()) ||
       field.label.toLowerCase().includes(fieldSearch.toLowerCase());
   });
+
+  const popularQuickAdd = (currentDashboardType === 'crypto' ? POPULAR_CRYPTO : currentDashboardType === 'indian-market' ? INDIAN_SYMBOLS : POPULAR_SYMBOLS).slice(0, 15);
 
   return (
     <Dialog open={isAddWidgetOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -285,7 +285,7 @@ export function AddWidgetDialog() {
                     </div>
 
                     {widgetType === 'card' && (
-                      <>
+                      <div className="space-y-4">
                         <div className="grid gap-2">
                           <Label>Card Layout</Label>
                           <Tabs value={cardLayout} onValueChange={(v) => setCardLayout(v as 'single' | 'list' | 'movers')}>
@@ -313,13 +313,33 @@ export function AddWidgetDialog() {
                                   <Plus className="h-4 w-4" />
                                 </Button>
                               </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
+                              <div className="flex flex-wrap gap-1 mt-2 min-h-[32px]">
                                 {symbols.map((sym) => (
                                   <Badge key={sym} variant="secondary" className="flex items-center gap-1">
                                     {sym}
                                     <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveSymbol(sym)} />
                                   </Badge>
                                 ))}
+                              </div>
+                              <div className="space-y-1 mt-2">
+                                <Label className="text-xs text-muted-foreground font-semibold">Popular Quick Add</Label>
+                                <div className="flex flex-wrap gap-1">
+                                  {popularQuickAdd.map((s) => (
+                                    <button
+                                      key={s.symbol}
+                                      type="button"
+                                      onClick={() => {
+                                        if (!symbols.includes(s.symbol)) {
+                                          setSymbols((prev) => [...prev, s.symbol]);
+                                        }
+                                      }}
+                                      disabled={symbols.includes(s.symbol)}
+                                      className="rounded bg-muted px-2 py-1 text-[10px] font-medium hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50"
+                                    >
+                                      + {s.symbol}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           ) : (
@@ -346,7 +366,7 @@ export function AddWidgetDialog() {
                             </div>
                           )
                         )}
-                      </>
+                      </div>
                     )}
 
                     {widgetType === 'chart' && (
@@ -399,21 +419,49 @@ export function AddWidgetDialog() {
                     )}
 
                     {widgetType === 'table' && (
-                      <div className="grid gap-2">
-                        <Label>Table Symbols</Label>
-                        <Input
-                          placeholder="e.g. RELIANCE, TCS"
-                          value={symbol}
-                          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddSymbol()}
-                        />
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {symbols.map((sym) => (
-                            <Badge key={sym} variant="secondary" className="flex items-center gap-1">
-                              {sym}
-                              <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveSymbol(sym)} />
-                            </Badge>
-                          ))}
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>Table Symbols</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="e.g. RELIANCE, TCS"
+                              value={symbol}
+                              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddSymbol()}
+                              className="flex-1"
+                            />
+                            <Button variant="outline" size="icon" onClick={handleAddSymbol}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-2 min-h-[32px]">
+                            {symbols.map((sym) => (
+                              <Badge key={sym} variant="secondary" className="flex items-center gap-1">
+                                {sym}
+                                <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveSymbol(sym)} />
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground font-semibold">Popular Quick Add</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {popularQuickAdd.map((s) => (
+                              <button
+                                key={s.symbol}
+                                type="button"
+                                onClick={() => {
+                                  if (!symbols.includes(s.symbol)) {
+                                    setSymbols((prev) => [...prev, s.symbol]);
+                                  }
+                                }}
+                                disabled={symbols.includes(s.symbol)}
+                                className="rounded bg-muted px-2 py-1 text-[10px] font-medium hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50"
+                              >
+                                + {s.symbol}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}
