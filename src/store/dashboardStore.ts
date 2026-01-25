@@ -30,6 +30,7 @@ interface DashboardState {
   removeWidget: (id: string) => void;
   updateWidget: (id: string, updates: Partial<WidgetConfig>) => void;
   reorderWidgets: (widgets: WidgetConfig[]) => void;
+  setWidgets: (widgets: WidgetConfig[]) => void;
 
   // Watchlist actions
   addToWatchlist: (symbol: string) => void;
@@ -124,8 +125,22 @@ export const useDashboardStore = create<DashboardState>()(
         }));
       },
 
-      // Reorder widgets (for drag and drop)
-      reorderWidgets: (widgets) => {
+      // Reorder widgets for CURRENT dashboard ONLY (prevents wiping other dashboards)
+      reorderWidgets: (newFilteredWidgets) => {
+        const state = get();
+        const currentType = state.currentDashboardType;
+
+        // Preserve widgets from OTHER dashboards
+        const otherWidgets = state.widgets.filter((w) =>
+          w.dashboardType && w.dashboardType !== currentType
+        );
+
+        // Merge preserved widgets with the new order of current widgets
+        set({ widgets: [...otherWidgets, ...newFilteredWidgets] });
+      },
+
+      // Set ALL widgets globally
+      setWidgets: (widgets) => {
         set({ widgets });
       },
 

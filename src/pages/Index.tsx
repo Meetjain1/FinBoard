@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getExchangeRates } from '@/lib/currency';
 
 const Index = () => {
-  const { setTheme, widgets, reorderWidgets } = useDashboardStore();
+  const { setTheme, widgets, reorderWidgets, setWidgets } = useDashboardStore();
   const { toast } = useToast();
 
   // Initialize theme on mount
@@ -49,7 +49,7 @@ const Index = () => {
 
       if (uniqueWidgets.length !== widgets.length) {
         console.warn(`Cleaned up ${widgets.length - uniqueWidgets.length} duplicate widgets`);
-        reorderWidgets(uniqueWidgets);
+        setWidgets(uniqueWidgets);
       }
     }
   }, []); // Only run once on mount

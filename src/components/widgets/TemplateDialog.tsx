@@ -30,11 +30,23 @@ export function TemplateDialog() {
   const { toast } = useToast();
 
   const handleSelectTemplate = (template: DashboardTemplate) => {
+    const dashboardType = template.id;
+    const currentWidgets = widgets.filter(w => w.dashboardType === dashboardType);
+    const hasData = currentWidgets.length > 0;
+
     loadTemplate(template);
-    toast({
-      title: 'Template Loaded',
-      description: `${template.name} has been applied to your dashboard.`,
-    });
+
+    if (hasData) {
+      toast({
+        title: 'Switched Dashboard',
+        description: `Now viewing ${template.name}.`,
+      });
+    } else {
+      toast({
+        title: 'Template Applied',
+        description: `${template.name} has been set up with default widgets.`,
+      });
+    }
   };
 
   return (
